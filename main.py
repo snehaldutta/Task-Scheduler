@@ -450,7 +450,7 @@ def render_content():
 @rt("/", methods=["GET"])
 def get():
     """Main page route"""
-    return Titled("Task Scheduler with Auto-Delete", render_content())
+    return Titled(render_content())
 
 @rt("/submit-task", methods=["POST"])
 def post(task: str, time: str):

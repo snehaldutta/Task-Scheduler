@@ -419,7 +419,7 @@ def render_content():
                 type="time",
                 name="time",
                 required=True,
-                id='task-input',
+                id='time-input',
                 cls="input input-bordered w-full mt-2"
             ),
             Button("➕ Add Task", type="submit", cls="btn btn-primary mt-4 w-full"),

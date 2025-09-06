@@ -170,13 +170,13 @@ js_script = """
                     let notificationShown = false;
                     
                     if (Notification.permission === 'granted') {
-                        new Notification('⏰ Task Reminder', {
+                        new Notification('Task Reminder', {
                             body: taskText,
-                            icon: '⏰'
+                            //icon: '⏰'
                         });
                         notificationShown = true;
                     } else {
-                        alert(`⏰ Reminder: ${taskText}`);
+                        alert(`Reminder: ${taskText}`);
                         notificationShown = true;
                     }
                     
@@ -261,7 +261,7 @@ def render_tasks(task):
                 ),
                 cls="flex justify-between items-center"
             ),
-            P(f"⏰ {task['time']}"),
+            P(f"{task['time']}"),
             cls="card-body"
         ),
         cls="card bg-base-200 shadow-md my-2 transition-all duration-500",

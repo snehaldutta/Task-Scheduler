@@ -412,12 +412,14 @@ def render_content():
                 placeholder="Enter task",
                 required=True,
                 maxlength=50,
+                id='task-input',
                 cls="input input-bordered w-full"
             ),
             Input(
                 type="time",
                 name="time",
                 required=True,
+                id='task-input',
                 cls="input input-bordered w-full mt-2"
             ),
             Button("➕ Add Task", type="submit", cls="btn btn-primary mt-4 w-full"),
@@ -427,7 +429,16 @@ def render_content():
         hx_post="/submit-task",
         hx_target="#task_list",
         hx_swap="outerHTML",
-        hx_on_after_request="this.reset(); setTimeout(checkReminders, 100);",
+        hx_on__after_request="""
+            document.getElementById('task-input').value=''; 
+            document.getElementById('time-input').value=''; 
+            document.getElementById('task-input').classList.add('input-success');
+            setTimeout(() => {
+                document.getElementById('task-input').classList.remove('input-success');
+            }, 1000);
+            setTimeout(checkReminders, 100);
+        """,
+        id='task-form',
         cls="card bg-base-100 shadow-xl w-96"
     )
 

@@ -31,20 +31,27 @@ js_script = """
         const alertedTasks = new Set();
         const today = new Date().toDateString();
         
-        // Load previously alerted tasks from localStorage
-        const storedAlerts = localStorage.getItem('alertedTasks');
-        if (storedAlerts) {
-            const parsed = JSON.parse(storedAlerts);
-            if (parsed.date === today) {
-                parsed.tasks.forEach(t => alertedTasks.add(t));
+        console.log('🚀 Alert system initializing...');
+        
+        // Load previously alerted tasks from localStorage (with error handling)
+        try {
+            const storedAlerts = localStorage.getItem('alertedTasks');
+            if (storedAlerts) {
+                const parsed = JSON.parse(storedAlerts);
+                if (parsed.date === today) {
+                    parsed.tasks.forEach(t => alertedTasks.add(t));
+                    console.log('📚 Loaded', alertedTasks.size, 'previously alerted tasks');
+                }
             }
+        } catch (e) {
+            console.warn('⚠️ localStorage not available or corrupted:', e);
         }
         
         // ============================================
         // DELETE TASK FUNCTION - Deletes from DB and Webpage
         // ============================================
         async function deleteTask(taskId) {
-            console.log(`Attempting to delete task ${taskId}...`);
+            console.log(`🗑️ Attempting to delete task ${taskId}...`);
             
             try {
                 // 1. First, delete from database
@@ -59,7 +66,8 @@ js_script = """
                     console.log(`✓ Task ${taskId} deleted from database`);
                     
                     // 2. Then remove from webpage with animation
-                    const taskElement = document.getElementById(`task-${taskId}`);
+                    const taskElement = document.getElementById(`task-${taskId}`) || 
+                                      document.querySelector(`[data-task-id="${taskId}"]`);
                     
                     if (taskElement) {
                         console.log(`Found task element, removing from webpage...`);
@@ -68,7 +76,7 @@ js_script = """
                         taskElement.style.transition = 'all 0.5s ease-out';
                         taskElement.style.opacity = '0';
                         taskElement.style.transform = 'translateX(100%)';
-                        taskElement.style.backgroundColor = '#fee2e2'; // Light red background
+                        taskElement.style.backgroundColor = '#fee2e2';
                         
                         // Remove from DOM after animation completes
                         setTimeout(() => {
@@ -79,27 +87,6 @@ js_script = """
                         return true;
                     } else {
                         console.error(`Could not find task element with id: task-${taskId}`);
-                        
-                        // Alternative: Try to find by data attribute
-                        const taskByData = document.querySelector(`[data-task-id="${taskId}"]`);
-                        if (taskByData) {
-                            console.log(`Found task by data attribute, removing...`);
-                            taskByData.style.transition = 'all 0.5s ease-out';
-                            taskByData.style.opacity = '0';
-                            taskByData.style.transform = 'translateX(100%)';
-                            taskByData.style.backgroundColor = '#fee2e2';
-                            
-                            setTimeout(() => {
-                                taskByData.remove();
-                                console.log(`✓ Task ${taskId} removed from webpage (via data attribute)`);
-                            }, 500);
-                            
-                            return true;
-                        }
-                        
-                        console.error(`Task element not found in DOM`);
-                        
-                        // Last resort: Refresh the entire task list
                         await refreshTaskList();
                         return true;
                     }
@@ -135,7 +122,83 @@ js_script = """
         }
         
         // ============================================
-        // CHECK REMINDERS FUNCTION
+        // IMPROVED ALERT SYSTEM
+        // ============================================
+        function showAlert(taskText, taskId) {
+            console.log('🔔 Showing alert for:', taskText);
+            
+            // Try multiple alert methods for better compatibility
+            let alertShown = false;
+            
+            // Method 1: Browser Notification API
+            if ('Notification' in window && Notification.permission === 'granted') {
+                try {
+                    new Notification('⏰ Task Reminder', {
+                        body: taskText,
+                        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">⏰</text></svg>',
+                        tag: `task-${taskId}`, // Prevent duplicates
+                        requireInteraction: true // Keep notification visible
+                    });
+                    alertShown = true;
+                    console.log('✓ Browser notification shown');
+                } catch (e) {
+                    console.warn('⚠️ Notification failed:', e);
+                }
+            }
+            
+            // Method 2: Browser alert (fallback)
+            if (!alertShown) {
+                try {
+                    alert(`TASK REMINDER: ${taskText}`);
+                    alertShown = true;
+                    console.log('✓ Browser alert shown');
+                } catch (e) {
+                    console.warn('⚠️ Alert failed:', e);
+                }
+            }
+            
+            // Method 3: Visual alert on page (last resort)
+            if (!alertShown) {
+                showVisualAlert(taskText);
+                alertShown = true;
+                console.log('✓ Visual alert shown');
+            }
+            
+            return alertShown;
+        }
+        
+        function showVisualAlert(taskText) {
+            // Create a visual alert div
+            const alertDiv = document.createElement('div');
+            alertDiv.innerHTML = `
+                <div class="alert alert-warning shadow-lg fixed top-4 left-1/2 transform -translate-x-1/2 z-50 max-w-md">
+                    <div>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current flex-shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                        <div>
+                            <h3 class="font-bold">Task Reminder!</h3>
+                            <div class="text-xs">${taskText}</div>
+                        </div>
+                    </div>
+                    <div class="flex-none">
+                        <button class="btn btn-sm" onclick="this.parentElement.parentElement.remove()">OK</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(alertDiv);
+            
+            // Auto-remove after 10 seconds
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 10000);
+        }
+        
+        // ============================================
+        // CHECK REMINDERS FUNCTION (IMPROVED)
         // ============================================
         async function checkReminders() {
             const now = new Date();
@@ -143,16 +206,26 @@ js_script = """
             const currentMinute = String(now.getMinutes()).padStart(2, '0');
             const currentTime = `${currentHour}:${currentMinute}`;
             
-            console.log(`Checking reminders at ${currentTime}...`);
+            console.log(`🔍 Checking reminders at ${currentTime}...`);
             
             // Get all task elements dynamically
             const taskElements = document.querySelectorAll('[data-task-time]');
-            console.log(`Found ${taskElements.length} tasks to check`);
+            console.log(`📋 Found ${taskElements.length} tasks to check`);
+            
+            if (taskElements.length === 0) {
+                console.log('📋 No tasks found to check');
+                return;
+            }
             
             for (const elem of taskElements) {
                 const taskTime = elem.dataset.taskTime;
                 const taskId = elem.dataset.taskId;
-                const taskText = elem.querySelector('.card-title')?.textContent || 'Task';
+                const taskText = elem.querySelector('.card-title')?.textContent || 'Unknown Task';
+                
+                if (!taskTime || !taskId) {
+                    console.warn('⚠️ Task missing time or ID:', {taskTime, taskId});
+                    continue;
+                }
                 
                 // Extract HH:MM from HH:MM:SS format
                 const taskHourMin = taskTime.substring(0, 5);
@@ -160,70 +233,90 @@ js_script = """
                 // Create unique key for this task alert
                 const alertKey = `${taskId}-${taskTime}`;
                 
-                console.log(`Checking task ${taskId}: ${taskHourMin} vs ${currentTime}`);
+                console.log(`🕐 Checking task ${taskId} (${taskText}): ${taskHourMin} vs ${currentTime}`);
                 
                 // Check if time matches and we haven't alerted yet
                 if (taskHourMin === currentTime && !alertedTasks.has(alertKey)) {
-                    console.log(`Time match for task: ${taskText}`);
+                    console.log(`🎯 TIME MATCH! Triggering alert for: ${taskText}`);
                     
                     // Show notification
-                    let notificationShown = false;
+                    const alertShown = showAlert(taskText, taskId);
                     
-                    if (Notification.permission === 'granted') {
-                        new Notification('Task Reminder', {
-                            body: taskText,
-                            //icon: '⏰'
-                        });
-                        notificationShown = true;
-                    } else {
-                        alert(`Reminder: ${taskText}`);
-                        notificationShown = true;
-                    }
-                    
-                    // Mark as alerted
-                    alertedTasks.add(alertKey);
-                    
-                    // Save to localStorage
-                    localStorage.setItem('alertedTasks', JSON.stringify({
-                        date: today,
-                        tasks: Array.from(alertedTasks)
-                    }));
-                    
-                    // AUTO-DELETE AFTER NOTIFICATION
-                    if (notificationShown && taskId) {
-                        console.log(`Will delete task ${taskId} in 1 second...`);
+                    if (alertShown) {
+                        // Mark as alerted
+                        alertedTasks.add(alertKey);
                         
-                        // Wait 1 second, then delete the task
+                        // Save to localStorage (with error handling)
+                        try {
+                            localStorage.setItem('alertedTasks', JSON.stringify({
+                                date: today,
+                                tasks: Array.from(alertedTasks)
+                            }));
+                            console.log('💾 Saved alert to localStorage');
+                        } catch (e) {
+                            console.warn('⚠️ Could not save to localStorage:', e);
+                        }
+                        
+                        // AUTO-DELETE AFTER NOTIFICATION
+                        console.log(`⏳ Will delete task ${taskId} in 2 seconds...`);
+                        
                         setTimeout(async () => {
-                            console.log(`Now deleting task ${taskId}...`);
+                            console.log(`🗑️ Now deleting task ${taskId}...`);
                             const deleteSuccess = await deleteTask(taskId);
                             
                             if (deleteSuccess) {
-                                console.log(`✅ Task "${taskText}" deleted successfully`);
+                                console.log(`✅ Task "${taskText}" completed and deleted`);
                             } else {
                                 console.log(`❌ Failed to delete task "${taskText}"`);
                             }
-                        }, 1000);
+                        }, 2000);
                     }
                 }
             }
         }
         
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        console.log('🔐 Requesting notification permission...');
+        
         // Request notification permission on load
-        if ('Notification' in window && Notification.permission === 'default') {
-            Notification.requestPermission();
+        if ('Notification' in window) {
+            if (Notification.permission === 'default') {
+                Notification.requestPermission().then(permission => {
+                    console.log('🔔 Notification permission:', permission);
+                });
+            } else {
+                console.log('🔔 Current notification permission:', Notification.permission);
+            }
+        } else {
+            console.warn('⚠️ Notifications not supported in this browser');
         }
         
-        // Check every 30 seconds
-        setInterval(checkReminders, 30000);
+        // Check every 15 seconds instead of 30 for better accuracy
+        const checkInterval = setInterval(checkReminders, 15000);
+        console.log('⏰ Started reminder checker (every 15 seconds)');
         
         // Check immediately on load
-        checkReminders();
+        setTimeout(() => {
+            console.log('🚀 Running initial reminder check...');
+            checkReminders();
+        }, 1000);
         
-        // Make functions available globally for testing
+        // Debug function to test alerts
+        window.testAlert = function(taskText = 'Test Task') {
+            console.log('🧪 Testing alert system...');
+            showAlert(taskText, 'test');
+        };
+        
+        // Make functions available globally
         window.deleteTask = deleteTask;
         window.checkReminders = checkReminders;
         window.refreshTaskList = refreshTaskList;
+        window.showAlert = showAlert;
+        
+        console.log('✅ Alert system fully initialized!');
+        console.log('💡 Test with: testAlert("My Test Task")
 """
 
 # ---------------- Database helpers ----------------
